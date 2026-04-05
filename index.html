@@ -781,8 +781,31 @@ async function doSend() {
   };
 
   try {
+    // STEP 1: Create emergency entry
     const newRecordRef = await db.ref('active_emergencies').push(emergencyData);
     S.recordId = newRecordRef.key;
+    
+    console.log("✅ Emergency created with ID:", S.recordId);
+
+    // ════════════════════════════════════════════════════════════
+    // ADD THESE 3 STEPS HERE ← INSERT POINT
+    // ════════════════════════════════════════════════════════════
+    
+    // STEP 2: TRIGGER ESP32 AMBULANCE
+    console.log("📝 Triggering ambulance ESP32...");
+    const ambulanceRef = db.ref('ambulances/AMB-001/emergency_id');
+    await ambulanceRef.set(S.recordId);
+    console.log("✅ Ambulance triggered! emergency_id set to:", S.recordId);
+    
+    // STEP 3: Update ambulance status
+    console.log("📝 Updating ambulance status...");
+    const statusRef = db.ref('ambulances/AMB-001/status');
+    await statusRef.set('responding');
+    console.log("✅ Ambulance status: responding");
+    
+    // ════════════════════════════════════════════════════════════
+    // END OF NEW CODE
+    // ════════════════════════════════════════════════════════════
 
     document.getElementById('ov-status').textContent = currentLang === 'te' ? 'డేటా సేవ్ చేయబడింది ✓' : 'Data Saved ✓';
     await sleep(800);
@@ -794,7 +817,6 @@ async function doSend() {
     toast('⚠ డేటా పంపడంలో విఫలమైంది!', 'err');
   }
 }
-
 // ──────────────────────────────────────────
 // 10. SCREEN 2
 // ──────────────────────────────────────────
