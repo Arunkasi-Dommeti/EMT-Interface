@@ -481,6 +481,7 @@ const db = firebase.database();
 // ──────────────────────────────────────────
 // 2. STATE & LANG
 // ──────────────────────────────────────────
+const GEMINI_API_KEY = "AIzaSyC3sMM7pbk8_SzdJFkfms3WqcovLyxUR8I"; 
 window.currentLang = 'te';
 const S = {
   type: '', symptoms: [], age: '', gender: '',
@@ -676,18 +677,29 @@ async function callAI(type) {
   const prompt = `You are an emergency medical assistant. An ambulance EMT in India is responding to a ${eLabel} emergency.\n${p1}\nFormat: Number each step 1-5. Keep each step concise (1-2 lines).\n${p2}`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-goog-api-key': GEMINI_API_KEY 
+      },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 600,
-        messages: [{ role: 'user', content: prompt }]
+        contents: [
+          {
+            parts: [
+              { text: prompt }
+            ]
+          }
+        ]
       })
     });
+    
     const data = await res.json();
-    renderAIContent(data.content?.[0]?.text || '');
+    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    renderAIContent(aiText);
+    
   } catch (e) {
+    console.error("Gemini API Error:", e);
     renderAIContent(getStaticFirstAid(type, currentLang));
   }
 }
@@ -984,21 +996,31 @@ async function loadNavAI(h) {
   const prompt = `Emergency ambulance in India approaching ${h.name} hospital with a ${eLabel} patient.\n${p1} Be specific and practical.`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-goog-api-key': GEMINI_API_KEY 
+      },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 300,
-        messages: [{ role: 'user', content: prompt }]
+        contents: [
+          {
+            parts: [
+              { text: prompt }
+            ]
+          }
+        ]
       })
     });
+
     const data = await res.json();
-    panel.textContent = data.content?.[0]?.text || (currentLang === 'te' ? 'ఆసుపత్రికి చేరుకోవడానికి సిద్ధంగా ఉండండి.' : 'Prepare for hospital arrival.');
-  } catch {
-    panel.textContent = currentLang === 'te' 
-        ? `${h.name}కి చేరుకోవడానికి ${h.eta} నిమిషాలు మాత్రమే ఉంది. రోగి స్థితిని నిరంతరం పర్యవేక్షించండి. ఆసుపత్రి సిబ్బంది సిద్ధంగా ఉంది.`
-        : `Only ${h.eta} minutes remaining to reach ${h.name}. Monitor patient continuously. Hospital staff is on standby.`;
+    panel.textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || (currentLang === 'te' ? 'సిద్ధంగా ఉండండి.' : 'Prepare for hospital arrival.');
+    
+  } catch (e) {
+    console.error("Gemini API Error:", e);
+    panel.textContent = currentLang === 'te'
+      ? `${h.name}కి చేరుకోవడానికి ${h.eta} నిమిషాలు మాత్రమే ఉంది. రోగి స్థితిని నిరంతరం పర్యవేక్షించండి. ఆసుపత్రి సిబ్బంది సిద్ధంగా ఉంది.`
+      : `Only ${h.eta} minutes remaining to reach ${h.name}. Monitor patient continuously. Hospital staff is on standby.`;
   }
 }
 
