@@ -481,6 +481,9 @@ const db = firebase.database();
 // ──────────────────────────────────────────
 // 2. STATE & LANG
 // ──────────────────────────────────────────
+//
+// 2. STATE & LANG
+//
 const GEMINI_API_KEY = "AIzaSyC3sMM7pbk8_SzdJFkfms3WqcovLyxUR8I"; 
 window.currentLang = 'te';
 const S = {
@@ -571,15 +574,14 @@ function switchLanguage(lang) {
   });
   
   updateGPSUI();
+if (document.getElementById('st1').classList.contains('done')) {
+    // Ee okka line kothaga add chesthunnam
+    if (!S.type || !EMERGENCY_DATA[S.type]) return; 
 
-  if (S.type) {
-    renderSymptoms(S.type);
-  }
-  
-  if (document.getElementById('st1').classList.contains('done')) {
     const eData = EMERGENCY_DATA[S.type];
-    const eLabel = lang === 'te' ? eData.label_te : eData.label_en;
-    const symTxt = lang === 'te' ? `${S.symptoms.length} లక్షణాలు` : `${S.symptoms.length} Symptoms`;
+    const eLabel = currentLang === 'te' ? eData.label_te : eData.label_en;
+    const symTxt = currentLang === 'te' ? `${S.symptoms.length} లక్షణాలు` : `${S.symptoms.length} Symptoms`;
+    
     document.getElementById('case-bar').innerHTML =
       `<span class="ctag ctag-red">${eLabel}</span>
        <span class="ctag ctag-amb">${symTxt}</span>
@@ -668,36 +670,33 @@ function renderSymptoms(type) {
 // ──────────────────────────────────────────
 async function callAI(type) {
   const panel = document.getElementById('ai-content');
-  panel.innerHTML = currentLang === 'te' ? '<span class="typing">AI సూచనలు తయారు చేస్తోంది</span>' : '<span class="typing">Generating AI Instructions</span>';
+  panel.innerHTML = currentLang === 'te' ? '<span class="typing">AI ఆలోచిస్తోంది...</span>' : '<span class="typing">Generating AI Instructions...</span>';
   panel.className = 'ai-content loading';
 
-  const eLabel = EMERGENCY_DATA[type]?.label_en || type;
-  const p1 = currentLang === 'te' ? 'Give exactly 5 critical first aid steps in Telugu language (తెలుగులో) that the EMT must do immediately during transit.' : 'Give exactly 5 critical first aid steps in English that the EMT must do immediately during transit.';
+  const eData = EMERGENCY_DATA[type];
+  if (!eData) return;
+  const eLabel = eData.label_en || type;
+
+  const p1 = currentLang === 'te' ? 'Give exactly 5 critical first aid steps in Telugu language (Telugu script) that the EMT must do immediately during transit.' : 'Give exactly 5 critical first aid steps in English that the EMT must do immediately during transit.';
   const p2 = currentLang === 'te' ? 'End with one important WARNING in Telugu. Be specific and medically accurate. Use Telugu script.' : 'End with one important WARNING in English. Be specific and medically accurate.';
-  const prompt = `You are an emergency medical assistant. An ambulance EMT in India is responding to a ${eLabel} emergency.\n${p1}\nFormat: Number each step 1-5. Keep each step concise (1-2 lines).\n${p2}`;
+
+  const prompt = `You are an emergency medical assistant. An ambulance EMT in India is responding to a ${eLabel} emergency.\n${p1}\nFormat: Numbered list. Be concise (1-2 lines).\n${p2}`;
 
   try {
-    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent', {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-goog-api-key': GEMINI_API_KEY 
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: prompt }
-            ]
-          }
-        ]
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 600 }
       })
     });
-    
+
     const data = await res.json();
-    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    renderAIContent(aiText);
+    if (data.error) throw new Error(data.error.message);
     
+    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    renderAIContent(aiText);
   } catch (e) {
     console.error("Gemini API Error:", e);
     renderAIContent(getStaticFirstAid(type, currentLang));
@@ -988,34 +987,28 @@ function loadNavMap(h) {
 
 async function loadNavAI(h) {
   const panel = document.getElementById('nav-ai');
-  panel.innerHTML = currentLang === 'te' ? '<span class="typing">AI సూచనలు తయారు చేస్తోంది</span>' : '<span class="typing">Generating AI Instructions</span>';
+  panel.innerHTML = currentLang === 'te' ? '<span class="typing">AI ట్రాన్సిట్ సూచనలు...</span>' : '<span class="typing">Generating AI Instructions...</span>';
+
+  const eData = EMERGENCY_DATA[S.type];
+  const eLabel = eData ? (eData.label_en || S.type) : S.type;
 
   const p1 = currentLang === 'te' ? 'Give 3 critical preparation instructions in Telugu for the EMT during the final transit.' : 'Give 3 critical preparation instructions in English for the EMT during the final transit.';
-  
-  const eLabel = EMERGENCY_DATA[S.type]?.label_en || S.type;
   const prompt = `Emergency ambulance in India approaching ${h.name} hospital with a ${eLabel} patient.\n${p1} Be specific and practical.`;
 
   try {
-    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent', {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-goog-api-key': GEMINI_API_KEY 
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: prompt }
-            ]
-          }
-        ]
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 300 }
       })
     });
 
     const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+
     panel.textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || (currentLang === 'te' ? 'సిద్ధంగా ఉండండి.' : 'Prepare for hospital arrival.');
-    
   } catch (e) {
     console.error("Gemini API Error:", e);
     panel.textContent = currentLang === 'te'
